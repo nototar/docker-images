@@ -1,0 +1,141 @@
+FROM php:7.2-fpm
+
+ENV TZ=Asia/Jakarta
+
+RUN apt-get update 
+RUN apt-get upgrade -y
+
+RUN apt-get install -y git curl zip vim unzip nmap wget ffmpeg net-tools
+
+RUN docker-php-ext-install opcache
+RUN { \
+        echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.interned_strings_buffer=8'; \
+        echo 'opcache.max_accelerated_files=4000'; \
+        echo 'opcache.revalidate_freq=2'; \
+        echo 'opcache.fast_shutdown=1'; \
+        echo 'opcache.enable_cli=1'; \
+    } > /usr/local/etc/php/conf.d/php-opocache-cfg.ini
+
+RUN apt-get install -y libfreetype6-dev libjpeg62-turbo-dev libpng-dev
+# utk php 7.2/7.3 -----------------------------------------------------------------
+RUN docker-php-ext-configure gd --with-freetype-dir --with-jpeg-dir=/usr/include/
+# ---------------------------------------------------------------------------------
+# utk php 7.4/8.1 -----------------------------------------------------------------------
+# RUN docker-php-ext-configure gd --with-jpeg=/usr/include/ --with-freetype=/usr/include/
+# ---------------------------------------------------------------------------------------
+RUN docker-php-ext-install gd
+
+RUN apt-get install -y libpq-dev
+RUN docker-php-ext-install pdo pdo_pgsql pgsql
+RUN docker-php-ext-install pdo_mysql
+
+RUN apt-get install libldb-dev libldap2-dev -y
+RUN docker-php-ext-install ldap
+
+RUN apt-get install -y libicu-dev
+RUN docker-php-ext-install intl
+
+RUN apt-get install -y libmagickwand-dev --no-install-recommends
+RUN pecl install imagick
+RUN docker-php-ext-enable imagick
+
+RUN apt-get install -y libmemcached-dev
+RUN pecl install memcached
+RUN docker-php-ext-enable memcached
+
+RUN docker-php-ext-install mysqli
+RUN docker-php-ext-enable mysqli
+
+RUN apt-get install -y libzip-dev
+# utk php 7.3 ----------------------------------
+# RUN docker-php-ext-configure zip --with-libzip
+# ----------------------------------------------
+RUN docker-php-ext-install zip
+
+RUN apt-get install -y libgmp-dev
+RUN docker-php-ext-install gmp
+
+RUN apt-get install -y libmcrypt-dev
+RUN pecl install mcrypt
+RUN docker-php-ext-enable mcrypt
+
+# hanya untuk php 7.2 ------------------------------
+# RUN apt-get install -y libedit-dev libreadline-dev
+# RUN docker-php-ext-install readline
+# --------------------------------------------------
+
+# setting PHP
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+# set variable
+ENV PHP_TIMEZONE Asia/Jakarta
+ENV PHP_FPM_LISTEN_MODE="0660"
+ENV PHP_MEMORY_LIMIT="512M"
+ENV PHP_MAX_UPLOAD="50M"
+ENV PHP_MAX_FILE_UPLOAD="200"
+ENV PHP_MAX_POST="100M"
+ENV PHP_DISPLAY_ERRORS="On"
+ENV PHP_DISPLAY_STARTUP_ERRORS="On"
+ENV PHP_ERROR_REPORTING="E_COMPILE_ERROR\|E_RECOVERABLE_ERROR\|E_ERROR\|E_CORE_ERROR"
+ENV PHP_CGI_FIX_PATHINFO=0
+
+# replace some of configuration on php.ini
+RUN sed -i 's!;*date.timezone.*!date.timezone = ${PHP_TIMEZONE}!g' $PHP_INI_DIR/php.ini
+RUN sed -i "s|display_errors\s*=\s*Off|display_errors = ${PHP_DISPLAY_ERRORS}|i" $PHP_INI_DIR/php.ini
+RUN sed -i "s|display_startup_errors\s*=\s*Off|display_startup_errors = ${PHP_DISPLAY_STARTUP_ERRORS}|i" $PHP_INI_DIR/php.ini
+RUN sed -i "s|error_reporting\s*=\s*E_ALL & ~E_DEPRECATED & ~E_STRICT|error_reporting = ${PHP_ERROR_REPORTING}|i" $PHP_INI_DIR/php.ini
+RUN sed -i "s|;*memory_limit =.*|memory_limit = ${PHP_MEMORY_LIMIT}|i" $PHP_INI_DIR/php.ini
+RUN sed -i "s|;*upload_max_filesize =.*|upload_max_filesize = ${PHP_MAX_UPLOAD}|i" $PHP_INI_DIR/php.ini
+RUN sed -i "s|;*max_file_uploads =.*|max_file_uploads = ${PHP_MAX_FILE_UPLOAD}|i" $PHP_INI_DIR/php.ini
+RUN sed -i "s|;*post_max_size =.*|post_max_size = ${PHP_MAX_POST}|i" $PHP_INI_DIR/php.ini
+RUN sed -i "s|;*cgi.fix_pathinfo=.*|cgi.fix_pathinfo= ${PHP_CGI_FIX_PATHINFO}|i" $PHP_INI_DIR/php.ini
+RUN sed -i "s|expose_php.*|expose_php = Off|i" $PHP_INI_DIR/php.ini
+
+# replace some of configuration on www.conf
+RUN sed -i "s|;log_level\s*=\s*notice|log_level = notice|g" /usr/local/etc/php-fpm.d/www.conf
+RUN sed -i "s|;listen.mode\s*=\s*0660|listen.mode = ${PHP_FPM_LISTEN_MODE}|g" /usr/local/etc/php-fpm.d/www.conf
+
+RUN sed -ri -e 's!pm.max_children = 5!pm.max_children = 50!g' /usr/local/etc/php-fpm.d/www.conf
+RUN sed -ri -e 's!pm.start_servers = 2!pm.start_servers = 3!g' /usr/local/etc/php-fpm.d/www.conf
+RUN sed -ri -e 's!pm.min_spare_servers = 1!pm.min_spare_servers = 2!g' /usr/local/etc/php-fpm.d/www.conf
+RUN sed -ri -e 's!pm.max_spare_servers = 3!pm.max_spare_servers = 6!g' /usr/local/etc/php-fpm.d/www.conf
+RUN sed -ri -e 's!;pm.max_requests = 500!pm.max_requests = 3000!g' /usr/local/etc/php-fpm.d/www.conf
+
+RUN sed -ri -e 's!;emergency_restart_threshold = 0!emergency_restart_threshold = 10!g' /usr/local/etc/php-fpm.conf
+RUN sed -ri -e 's!;emergency_restart_interval = 0!emergency_restart_interval = 1m!g' /usr/local/etc/php-fpm.conf
+RUN sed -ri -e 's!;process_control_timeout = 0!process_control_timeout = 10s!g' /usr/local/etc/php-fpm.conf
+
+# setting Nginx
+RUN apt-get install -y nginx
+
+RUN sed -ri -e 's!# server_tokens off;!server_tokens off;!g' /etc/nginx/nginx.conf
+RUN sed -ri -e 's!# gzip_vary on;!gzip_vary on;!g' /etc/nginx/nginx.conf
+RUN sed -ri -e 's!# gzip_proxied any;!gzip_proxied any;!g' /etc/nginx/nginx.conf
+RUN sed -ri -e 's!# gzip_comp_level 6;!gzip_comp_level 6;!g' /etc/nginx/nginx.conf
+RUN sed -ri -e 's!# gzip_buffers 16 8k;!gzip_buffers 16 8k;!g' /etc/nginx/nginx.conf
+RUN sed -ri -e 's!# gzip_http_version 1.1;!gzip_http_version 1.1;!g' /etc/nginx/nginx.conf
+RUN sed -ri -e 's!# gzip_types.*!gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;!g' /etc/nginx/nginx.conf
+
+COPY default.conf /etc/nginx/sites-enabled/default
+
+RUN mkdir /var/www/public
+RUN echo '<?php phpinfo(); ?>' > /var/www/public/index.php
+
+RUN touch /start.sh
+RUN echo 'nginx -g "daemon off;"' > /start.sh
+RUN chmod +x /start.sh
+RUN ln -sf /dev/stdout /var/log/nginx/access.log && ln -sf /dev/stderr /var/log/nginx/error.log
+
+COPY entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 80
+
+WORKDIR /var/www
+
+# CMD [ "nginx", "-g", "daemon off;" ]
+# CMD [ "php-fpm" ]
+# CMD [ "/start.sh" ]
+# ENTRYPOINT [ "/entrypoint.sh" ]
+CMD [ "sh", "-c", "service nginx start && php-fpm" ]
