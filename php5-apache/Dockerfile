@@ -5,7 +5,7 @@ ENV TZ=Asia/Jakarta
 RUN apt-get update 
 RUN apt-get upgrade -y
 
-RUN apt-get install -y git curl zip vim unzip nmap wget ffmpeg net-tools
+RUN apt-get install -y git curl zip vim unzip nmap wget ffmpeg net-tools iputils-ping
 
 RUN docker-php-ext-install opcache
 RUN { \
@@ -23,7 +23,12 @@ RUN docker-php-ext-install gd
 
 RUN apt-get install -y libpq-dev
 RUN docker-php-ext-install pdo pdo_pgsql pgsql
-RUN docker-php-ext-install pdo_mysql
+RUN docker-php-ext-install pdo_mysql mysql
+
+RUN docker-php-ext-install mysqli
+RUN docker-php-ext-enable mysqli
+
+RUN docker-php-ext-install zip
 
 RUN apt-get install libldap2-dev -y
 RUN rm -rf /var/lib/apt/lists/*
@@ -41,19 +46,12 @@ RUN docker-php-ext-install ldap
 # RUN pecl install memcached
 # RUN docker-php-ext-enable memcached
 
-RUN docker-php-ext-install mysqli
-RUN docker-php-ext-enable mysqli
-
-RUN docker-php-ext-install zip
-
 # RUN apt-get install -y libgmp-dev
 # RUN docker-php-ext-install gmp
 
 # RUN apt-get install -y libmcrypt-dev
 # RUN pecl install mcrypt
 # RUN docker-php-ext-enable mcrypt
-
-RUN apt-get install -y iputils-ping
 
 RUN a2enmod rewrite
 
