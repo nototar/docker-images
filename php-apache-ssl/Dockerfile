@@ -1,4 +1,4 @@
-FROM php:8.1-apache
+FROM php:7.4-apache
 
 ENV TZ=Asia/Jakarta
 
@@ -67,6 +67,8 @@ RUN docker-php-ext-enable mcrypt
 
 RUN docker-php-ext-install gettext
 
+RUN apt-get install -y poppler-utils
+
 RUN a2enmod rewrite
 
 RUN a2enmod ssl
@@ -118,5 +120,7 @@ RUN echo "Mutex posixsem" >> /etc/apache2/apache2.conf
 RUN sed -i '/Options Indexes FollowSymLinks/ {n; s/AllowOverride None/AllowOverride All/}' /etc/apache2/apache2.conf
 RUN sed -i 's!Options Indexes FollowSymLinks!Options -Indexes +FollowSymLinks!g' /etc/apache2/apache2.conf
 RUN sed -i 's!"%h!"%h \\"%{X-Forwarded-For}i\\"!g' /etc/apache2/apache2.conf
+
+EXPOSE 443
 
 WORKDIR /var/www

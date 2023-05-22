@@ -31,8 +31,9 @@ RUN { \
         echo 'opcache.enable_cli=1'; \
     } > /usr/local/etc/php/conf.d/php-opocache-cfg.ini
 
+RUN apt-get install -y libwebp-dev
 RUN apt-get install -y libfreetype6-dev libjpeg62-turbo-dev libpng-dev
-RUN docker-php-ext-configure gd --with-freetype-dir --with-jpeg-dir=/usr/include/
+RUN docker-php-ext-configure gd --with-freetype-dir --with-jpeg-dir=/usr/include/ --with-webp-dir=/usr/include/
 RUN docker-php-ext-install gd
 
 RUN apt-get install -y libpq-dev
